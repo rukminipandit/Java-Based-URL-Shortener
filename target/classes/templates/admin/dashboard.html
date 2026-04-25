@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — LinkVault Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body class="admin-page">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+    <div class="sidebar-logo">Link<span>Vault</span></div>
+    <nav class="sidebar-nav">
+        <a href="/admin/dashboard" class="sidebar-link active">
+            <span class="sidebar-icon">▤</span> Dashboard
+        </a>
+        <a href="/admin/links" class="sidebar-link">
+            <span class="sidebar-icon">🔗</span> All Links
+        </a>
+        <a href="/admin/api-keys" class="sidebar-link">
+            <span class="sidebar-icon">🔑</span> API Keys
+        </a>
+        <a href="/" class="sidebar-link">
+            <span class="sidebar-icon">⌂</span> Homepage
+        </a>
+    </nav>
+    <div class="sidebar-footer">
+        <form th:action="@{/admin/logout}" method="post">
+            <button type="submit" class="logout-btn">Sign Out</button>
+        </form>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="admin-main">
+    <header class="admin-header">
+        <h1 class="admin-page-title">Dashboard</h1>
+        <a href="/" class="header-action-btn">+ New Link</a>
+    </header>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" th:text="${stats.totalLinks}">0</div>
+            <div class="stat-label">Total Links</div>
+            <div class="stat-sub" th:text="${stats.activeLinks} + ' active'"></div>
+        </div>
+        <div class="stat-card accent">
+            <div class="stat-value" th:text="${stats.totalClicks}">0</div>
+            <div class="stat-label">Total Clicks</div>
+            <div class="stat-sub" th:text="${stats.clicksToday} + ' today'"></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" th:text="${stats.protectedLinks}">0</div>
+            <div class="stat-label">Protected Links</div>
+            <div class="stat-sub">password locked</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" th:text="${stats.analyticsLinks}">0</div>
+            <div class="stat-label">Tracked Links</div>
+            <div class="stat-sub">analytics enabled</div>
+        </div>
+    </div>
+
+    <!-- Chart + Recent Links -->
+    <div class="dashboard-grid">
+        <!-- 7-day Trend Chart -->
+        <div class="card chart-card">
+            <h3 class="card-title">Click Trend — Last 7 Days</h3>
+            <div class="chart-wrap">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Top Links -->
+        <div class="card">
+            <h3 class="card-title">Top Links by Clicks</h3>
+            <div class="top-links-list">
+                <div th:each="link : ${stats.topLinks}" class="top-link-row">
+                    <div class="top-link-info">
+                        <span class="top-link-code" th:text="'/' + ${link.shortCode}"></span>
+                        <span class="top-link-domain" th:text="${link.domain}"></span>
+                    </div>
+                    <div class="top-link-meta">
+                        <span class="top-link-clicks" th:text="${link.clickCount} + ' clicks'"></span>
+                        <a th:href="@{'/admin/links/' + ${link.id} + '/analytics'}" class="mini-link">Analytics →</a>
+                    </div>
+                </div>
+                <div th:if="${#lists.isEmpty(stats.topLinks)}" class="empty-state-small">No links yet.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Links Table -->
+    <div class="card">
+        <div class="card-header-row">
+            <h3 class="card-title">Recent Links</h3>
+            <a href="/admin/links" class="card-link">View all →</a>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Short Code</th>
+                        <th>Destination</th>
+                        <th>Clicks</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="link : ${recentLinks}">
+                        <td>
+                            <code class="short-code-cell" th:text="'/' + ${link.shortCode}"></code>
+                            <span th:if="${link.passwordProtected}" class="badge badge-lock" title="Password protected">🔒</span>
+                            <span th:if="${link.analyticsEnabled}" class="badge badge-analytics" title="Analytics enabled">📊</span>
+                        </td>
+                        <td><span class="url-cell" th:text="${link.originalUrlPreview}" th:title="${link.originalUrl}"></span></td>
+                        <td><strong th:text="${link.clickCount}"></strong></td>
+                        <td>
+                            <span th:class="${link.active} ? 'status-badge active' : 'status-badge inactive'"
+                                  th:text="${link.active} ? 'Active' : 'Disabled'"></span>
+                        </td>
+                        <td class="date-cell" th:text="${#temporals.format(link.createdAt, 'MMM dd, yyyy')}"></td>
+                        <td class="actions-cell">
+                            <a th:href="@{'/admin/links/' + ${link.id} + '/analytics'}" class="action-btn">Analytics</a>
+                            <button class="action-btn toggle-btn"
+                                    th:data-id="${link.id}"
+                                    th:data-active="${link.active}"
+                                    onclick="toggleLink(this)">
+                                <span th:text="${link.active} ? 'Disable' : 'Enable'"></span>
+                            </button>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(recentLinks)}">
+                        <td colspan="6" class="empty-row">No links created yet. <a href="/">Create one →</a></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<script th:inline="javascript">
+    const trendData = /*[[${stats.last7DaysTrend}]]*/ [];
+    const labels = trendData.map(d => d.date);
+    const counts = trendData.map(d => d.count);
+
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels.length > 0 ? labels : ['No data'],
+            datasets: [{
+                label: 'Clicks',
+                data: counts.length > 0 ? counts : [0],
+                borderColor: '#f97316',
+                backgroundColor: 'rgba(249,115,22,0.12)',
+                borderWidth: 2.5,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#f97316',
+                pointRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8' } },
+                y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#94a3b8' }, beginAtZero: true }
+            }
+        }
+    });
+
+    async function toggleLink(btn) {
+        const id = btn.dataset.id;
+        const isActive = btn.dataset.active === 'true';
+        try {
+            const res = await fetch(`/admin/links/${id}/toggle`, { method: 'POST', headers: {'X-CSRF-Token': getCsrfToken()} });
+            const data = await res.json();
+            btn.dataset.active = data.active;
+            btn.querySelector('span').textContent = data.active ? 'Disable' : 'Enable';
+            const row = btn.closest('tr');
+            const badge = row.querySelector('.status-badge');
+            badge.textContent = data.active ? 'Active' : 'Disabled';
+            badge.className = data.active ? 'status-badge active' : 'status-badge inactive';
+        } catch(e) { alert('Failed to toggle link.'); }
+    }
+
+    function getCsrfToken() {
+        const meta = document.querySelector('meta[name="_csrf"]');
+        return meta ? meta.content : '';
+    }
+</script>
+<script th:src="@{/js/main.js}"></script>
+</body>
+</html>

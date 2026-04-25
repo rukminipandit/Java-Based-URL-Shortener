@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics — LinkVault Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body class="admin-page">
+
+<aside class="sidebar">
+    <div class="sidebar-logo">Link<span>Vault</span></div>
+    <nav class="sidebar-nav">
+        <a href="/admin/dashboard" class="sidebar-link"><span class="sidebar-icon">▤</span> Dashboard</a>
+        <a href="/admin/links" class="sidebar-link active"><span class="sidebar-icon">🔗</span> All Links</a>
+        <a href="/admin/api-keys" class="sidebar-link"><span class="sidebar-icon">🔑</span> API Keys</a>
+        <a href="/" class="sidebar-link"><span class="sidebar-icon">⌂</span> Homepage</a>
+    </nav>
+    <div class="sidebar-footer">
+        <form th:action="@{/admin/logout}" method="post">
+            <button type="submit" class="logout-btn">Sign Out</button>
+        </form>
+    </div>
+</aside>
+
+<main class="admin-main">
+    <header class="admin-header">
+        <div>
+            <a href="/admin/links" class="back-crumb">← All Links</a>
+            <h1 class="admin-page-title" th:text="'Analytics: /' + ${mapping.shortCode}"></h1>
+            <a th:href="${shortUrl}" target="_blank" class="short-url-header-link" th:text="${shortUrl}"></a>
+        </div>
+        <div class="analytics-range-btns">
+            <a th:href="@{'/admin/links/' + ${mapping.id} + '/analytics'}(days=7)"
+               th:class="${days == 7} ? 'range-btn active' : 'range-btn'">7d</a>
+            <a th:href="@{'/admin/links/' + ${mapping.id} + '/analytics'}(days=30)"
+               th:class="${days == 30} ? 'range-btn active' : 'range-btn'">30d</a>
+            <a th:href="@{'/admin/links/' + ${mapping.id} + '/analytics'}(days=90)"
+               th:class="${days == 90} ? 'range-btn active' : 'range-btn'">90d</a>
+        </div>
+    </header>
+
+    <!-- Analytics Disabled State -->
+    <div th:if="${analyticsDisabled}" class="card analytics-disabled-card">
+        <div class="analytics-disabled-icon">📊</div>
+        <h3>Analytics not tracked for this link</h3>
+        <p>This link was created without analytics tracking enabled.<br>
+           Analytics can only be enabled at link creation time.</p>
+    </div>
+
+    <!-- Analytics Content -->
+    <div th:if="${!analyticsDisabled}">
+
+        <!-- Summary Stats -->
+        <div class="stats-grid">
+            <div class="stat-card accent">
+                <div class="stat-value" th:text="${summary.totalClicks}">0</div>
+                <div class="stat-label">Total Clicks</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" th:text="${summary.clicksToday}">0</div>
+                <div class="stat-label">Today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" th:text="${summary.clicksThisWeek}">0</div>
+                <div class="stat-label">This Week</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" th:text="${mapping.passwordProtected} ? '🔒' : '🔓'"></div>
+                <div class="stat-label" th:text="${mapping.passwordProtected} ? 'Protected' : 'Public'"></div>
+            </div>
+        </div>
+
+        <!-- Daily Click Chart -->
+        <div class="card chart-card-tall">
+            <h3 class="card-title" th:text="'Daily Clicks (Last ' + ${days} + ' Days)'"></h3>
+            <div class="chart-wrap tall">
+                <canvas id="dailyChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Breakdown Grid -->
+        <div class="breakdown-grid">
+
+            <!-- Browser Breakdown -->
+            <div class="card breakdown-card">
+                <h3 class="card-title">Browsers</h3>
+                <canvas id="browserChart" width="200" height="200"></canvas>
+                <div class="breakdown-legend" id="browserLegend"></div>
+            </div>
+
+            <!-- Device Breakdown -->
+            <div class="card breakdown-card">
+                <h3 class="card-title">Devices</h3>
+                <canvas id="deviceChart" width="200" height="200"></canvas>
+                <div class="breakdown-legend" id="deviceLegend"></div>
+            </div>
+
+            <!-- OS Breakdown -->
+            <div class="card breakdown-card">
+                <h3 class="card-title">Operating Systems</h3>
+                <div class="bar-breakdown">
+                    <div th:each="entry : ${summary.osBreakdown}" class="bar-row">
+                        <span class="bar-label" th:text="${entry.key}"></span>
+                        <div class="bar-track">
+                            <div class="bar-fill"
+                                 th:style="'width:' + (${summary.totalClicks > 0 ? (entry.value * 100 / summary.totalClicks) : 0}) + '%'">
+                            </div>
+                        </div>
+                        <span class="bar-count" th:text="${entry.value}"></span>
+                    </div>
+                    <div th:if="${#maps.isEmpty(summary.osBreakdown)}" class="empty-state-small">No data yet.</div>
+                </div>
+            </div>
+
+            <!-- Referrers -->
+            <div class="card breakdown-card">
+                <h3 class="card-title">Top Referrers</h3>
+                <div class="bar-breakdown">
+                    <div th:each="entry : ${summary.referrerBreakdown}" class="bar-row">
+                        <span class="bar-label" th:text="${entry.key != null && !entry.key.isEmpty() ? entry.key : 'Direct'}"></span>
+                        <div class="bar-track">
+                            <div class="bar-fill"
+                                 th:style="'width:' + (${summary.totalClicks > 0 ? (entry.value * 100 / summary.totalClicks) : 0}) + '%'">
+                            </div>
+                        </div>
+                        <span class="bar-count" th:text="${entry.value}"></span>
+                    </div>
+                    <div th:if="${#maps.isEmpty(summary.referrerBreakdown)}" class="empty-state-small">No referrer data.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Clicks Log -->
+        <div class="card">
+            <h3 class="card-title">Recent Click Activity</h3>
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Browser</th>
+                            <th>OS</th>
+                            <th>Device</th>
+                            <th>Referrer</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="click : ${summary.recentClicks}">
+                            <td th:text="${click.browser}"></td>
+                            <td th:text="${click.os}"></td>
+                            <td>
+                                <span class="device-badge" th:text="${click.deviceType}"></span>
+                            </td>
+                            <td th:text="${click.referrer}"></td>
+                            <td class="date-cell" th:text="${click.clickedAt}"></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(summary.recentClicks)}">
+                            <td colspan="5" class="empty-row">No clicks recorded yet.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script th:if="${!analyticsDisabled}" th:inline="javascript">
+    const dailyData   = /*[[${summary.dailyData}]]*/ [];
+    const browserData = /*[[${summary.browserBreakdown}]]*/ {};
+    const deviceData  = /*[[${summary.deviceBreakdown}]]*/ {};
+
+    const PALETTE = ['#f97316','#3b82f6','#10b981','#a855f7','#f43f5e','#eab308','#06b6d4'];
+
+    // Daily line chart
+    new Chart(document.getElementById('dailyChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: dailyData.map(d => d.date),
+            datasets: [{
+                label: 'Clicks',
+                data: dailyData.map(d => d.count),
+                backgroundColor: 'rgba(249,115,22,0.7)',
+                borderColor: '#f97316',
+                borderWidth: 1,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, beginAtZero: true }
+            }
+        }
+    });
+
+    // Browser doughnut
+    const bKeys = Object.keys(browserData);
+    const bVals = Object.values(browserData);
+    if (bKeys.length > 0) {
+        new Chart(document.getElementById('browserChart').getContext('2d'), {
+            type: 'doughnut',
+            data: { labels: bKeys, datasets: [{ data: bVals, backgroundColor: PALETTE }] },
+            options: { plugins: { legend: { display: false } }, cutout: '65%' }
+        });
+        const bl = document.getElementById('browserLegend');
+        bKeys.forEach((k, i) => {
+            bl.innerHTML += `<span class="legend-dot" style="background:${PALETTE[i % PALETTE.length]}"></span><span>${k}: ${bVals[i]}</span>`;
+        });
+    }
+
+    // Device doughnut
+    const dKeys = Object.keys(deviceData);
+    const dVals = Object.values(deviceData);
+    if (dKeys.length > 0) {
+        new Chart(document.getElementById('deviceChart').getContext('2d'), {
+            type: 'doughnut',
+            data: { labels: dKeys, datasets: [{ data: dVals, backgroundColor: PALETTE }] },
+            options: { plugins: { legend: { display: false } }, cutout: '65%' }
+        });
+        const dl = document.getElementById('deviceLegend');
+        dKeys.forEach((k, i) => {
+            dl.innerHTML += `<span class="legend-dot" style="background:${PALETTE[i % PALETTE.length]}"></span><span>${k}: ${dVals[i]}</span>`;
+        });
+    }
+</script>
+</body>
+</html>
