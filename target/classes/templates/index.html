@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkVault — Smart URL Shortener</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+</head>
+<body class="home-page">
+
+<!-- Navigation -->
+<nav class="nav">
+    <div class="nav-inner">
+        <a href="/" class="nav-logo">Link<span>Vault</span></a>
+        <a href="/admin/dashboard" class="nav-admin">Admin →</a>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <div class="hero-bg">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="grid-overlay"></div>
+    </div>
+
+    <div class="hero-content">
+        <div class="hero-badge">⚡ Fast. Smart. Secure.</div>
+        <h1 class="hero-title">Shorten.<br><span class="accent">Track.</span><br>Control.</h1>
+        <p class="hero-subtitle">Professional URL shortening with real-time analytics and password protection — built for power users.</p>
+    </div>
+
+    <!-- Main Form Card -->
+    <div class="form-card">
+
+        <!-- Success Banner -->
+        <div class="success-banner" th:if="${successUrl}" id="successBanner">
+            <div class="success-icon">✓</div>
+            <div class="success-content">
+                <p class="success-label">Your link is ready!</p>
+                <a th:href="${successUrl}" th:text="${successUrl}" class="success-link" target="_blank"></a>
+            </div>
+            <button class="copy-btn" th:data-copy="${successUrl}" onclick="copyToClipboard(this)">Copy</button>
+        </div>
+
+        <!-- Error Banner -->
+        <div class="error-banner" th:if="${formError}">
+            <span>⚠</span> <span th:text="${formError}"></span>
+        </div>
+
+        <!-- Form -->
+        <form th:action="@{/shorten}" method="post" th:object="${createRequest}" id="shortenForm">
+
+            <div class="url-input-group">
+                <input type="url" th:field="*{originalUrl}"
+                       placeholder="Paste your long URL here..."
+                       class="url-input" id="originalUrl" autocomplete="off" required />
+                <button type="submit" class="shorten-btn" id="submitBtn">
+                    <span class="btn-text">Shorten</span>
+                    <span class="btn-icon">→</span>
+                </button>
+            </div>
+
+            <!-- Settings Panel Toggle -->
+            <button type="button" class="settings-toggle" onclick="toggleSettings()">
+                <span class="settings-icon">⚙</span>
+                <span>Advanced Settings</span>
+                <span class="settings-arrow" id="settingsArrow">▼</span>
+            </button>
+
+            <!-- Settings Panel -->
+            <div class="settings-panel" id="settingsPanel">
+
+                <!-- Custom Code -->
+                <div class="setting-row">
+                    <label class="setting-label">
+                        <span class="setting-label-icon">🔗</span>
+                        Custom short code
+                    </label>
+                    <div class="custom-code-input-wrap">
+                        <span class="code-prefix">lv/</span>
+                        <input type="text" th:field="*{customCode}"
+                               placeholder="my-brand-link"
+                               class="code-input" id="customCode"
+                               maxlength="30"
+                               oninput="checkCodeAvailability(this.value)" />
+                        <span class="code-status" id="codeStatus"></span>
+                    </div>
+                    <p class="setting-hint">Leave blank to auto-generate. Only letters, numbers, - and _</p>
+                </div>
+
+                <!-- Title -->
+                <div class="setting-row">
+                    <label class="setting-label">
+                        <span class="setting-label-icon">📝</span>
+                        Link title (optional)
+                    </label>
+                    <input type="text" th:field="*{title}"
+                           placeholder="e.g. Summer Campaign Link"
+                           class="setting-input" maxlength="100" />
+                </div>
+
+                <!-- Analytics Toggle -->
+                <div class="setting-row setting-row-toggle">
+                    <div class="setting-toggle-info">
+                        <span class="setting-label-icon">📊</span>
+                        <div>
+                            <p class="setting-label-text">Track click analytics</p>
+                            <p class="setting-hint-inline">Record browser, device, referrer, and daily click trends</p>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" th:field="*{analyticsEnabled}" id="analyticsToggle" checked />
+                        <span class="toggle-track">
+                            <span class="toggle-thumb"></span>
+                        </span>
+                    </label>
+                </div>
+
+                <!-- Password Protection Toggle -->
+                <div class="setting-row setting-row-toggle">
+                    <div class="setting-toggle-info">
+                        <span class="setting-label-icon">🔒</span>
+                        <div>
+                            <p class="setting-label-text">Password protect this link</p>
+                            <p class="setting-hint-inline">Visitors must enter a password before being redirected</p>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" th:field="*{passwordProtected}" id="passwordToggle"
+                               onchange="togglePasswordField(this.checked)" />
+                        <span class="toggle-track">
+                            <span class="toggle-thumb"></span>
+                        </span>
+                    </label>
+                </div>
+
+                <!-- Password Input (shown when toggle is on) -->
+                <div class="setting-row" id="passwordRow" style="display:none;">
+                    <label class="setting-label">
+                        <span class="setting-label-icon">🗝</span>
+                        Set password
+                    </label>
+                    <div class="password-input-wrap">
+                        <input type="password" th:field="*{password}"
+                               placeholder="Enter a secure password"
+                               class="setting-input" id="linkPassword" />
+                        <button type="button" class="pwd-toggle-btn" onclick="togglePwdVisibility()">👁</button>
+                    </div>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</section>
+
+<!-- Features Strip -->
+<section class="features">
+    <div class="feature"><div class="feature-icon">⚡</div><p>Instant redirects</p></div>
+    <div class="feature"><div class="feature-icon">📊</div><p>Click analytics</p></div>
+    <div class="feature"><div class="feature-icon">🔒</div><p>Password protection</p></div>
+    <div class="feature"><div class="feature-icon">🔗</div><p>Custom short codes</p></div>
+    <div class="feature"><div class="feature-icon">🔑</div><p>REST API access</p></div>
+</section>
+
+<script th:src="@{/js/main.js}"></script>
+</body>
+</html>
